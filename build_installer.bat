@@ -3,10 +3,10 @@ chcp 65001 >nul
 echo ===== DesktopKit FolderViewer インストーラー作成 =====
 echo.
 
-REM --- publish（軽量版） ---
+REM --- publish ---
 echo [1/2] dotnet publish 実行中...
 cd /d "%~dp0FolderViewer"
-dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o "%~dp0publish-light"
+dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o "%~dp0publish"
 if errorlevel 1 (
     echo [エラー] publish に失敗しました。
     pause
@@ -19,7 +19,6 @@ REM --- Inno Setup コンパイル ---
 echo [2/2] Inno Setup コンパイル中...
 cd /d "%~dp0"
 
-REM Inno Setup の場所を探す
 set "ISCC="
 if exist "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" set "ISCC=C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
 if exist "C:\Program Files\Inno Setup 6\ISCC.exe" set "ISCC=C:\Program Files\Inno Setup 6\ISCC.exe"
