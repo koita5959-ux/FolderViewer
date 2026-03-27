@@ -312,6 +312,14 @@ namespace DesktopKit.FolderViewer
         {
             _currentRootPath = rootPath;
             txtFolderPath.Text = rootPath;
+
+            // 最深階層を計算してNumericUpDownに反映
+            var depth = TreeBuilder.CalcMaxDepth(rootPath);
+            nudDepth.ValueChanged -= NudDepth_ValueChanged;
+            nudDepth.Maximum = depth;
+            nudDepth.Value = depth;
+            nudDepth.ValueChanged += NudDepth_ValueChanged;
+
             BuildTree();
         }
 

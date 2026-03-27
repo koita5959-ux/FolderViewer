@@ -75,6 +75,42 @@ namespace DesktopKit.FolderViewer
             return node.ImageIndex == IconFolder;
         }
 
+        /// <summary>
+        /// 指定フォルダ配下の最深階層数を計算する。
+        /// アクセス権限のないフォルダはスキップ。空フォルダは1を返す。
+        /// </summary>
+        public static int CalcMaxDepth(string rootPath)
+        {
+            int maxDepth = 0;
+            CalcDepthRecursive(rootPath, 1, ref maxDepth);
+            return Math.Max(maxDepth, 1);
+        }
+
+        private static void CalcDepthRecursive(string dirPath, int currentDepth, ref int maxDepth)
+        {
+            try
+            {
+                var dirs = Directory.GetDirectories(dirPath);
+                if (dirs.Length == 0)
+                {
+                    if (currentDepth > maxDepth) maxDepth = currentDepth;
+                    return;
+                }
+                foreach (var dir in dirs)
+                {
+                    CalcDepthRecursive(dir, currentDepth + 1, ref maxDepth);
+                }
+            }
+            catch (UnauthorizedAccessException)
+            {
+                if (currentDepth > maxDepth) maxDepth = currentDepth;
+            }
+            catch (IOException)
+            {
+                if (currentDepth > maxDepth) maxDepth = currentDepth;
+            }
+        }
+
         private static void AddChildren(TreeNode parentNode, string dirPath, int currentDepth, int maxDepth, ref int folders, ref int files)
         {
             // フォルダを追加

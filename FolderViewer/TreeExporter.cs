@@ -57,6 +57,12 @@ namespace DesktopKit.FolderViewer
 
                 if (isFolder)
                 {
+                    // フォルダのフルパスは常に収集
+                    if (node.Tag is string dirPath)
+                    {
+                        fullPaths.Add(dirPath);
+                    }
+
                     if (node.Checked && node.Nodes.Count > 0)
                     {
                         // チェックON → フォルダ名を出力し、子を再帰展開
