@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Windows.Forms;
 using DesktopKit.Common;
@@ -11,6 +12,30 @@ namespace DesktopKit.FolderViewer
     /// </summary>
     public class MainForm : BaseForm
     {
+        // --- Win32 API: ノード単位のチェックボックス表示制御 ---
+        private const int TVIF_STATE = 0x0008;
+        private const int TVIS_STATEIMAGEMASK = 0xF000;
+        private const int TV_FIRST = 0x1100;
+        private const int TVM_SETITEM = TV_FIRST + 63; // TVM_SETITEMW
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        private struct TVITEM
+        {
+            public int mask;
+            public IntPtr hItem;
+            public int state;
+            public int stateMask;
+            public IntPtr pszText;
+            public int cchTextMax;
+            public int iImage;
+            public int iSelectedImage;
+            public int cChildren;
+            public IntPtr lParam;
+        }
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern IntPtr SendMessage(IntPtr hWnd, int Msg, IntPtr wParam, ref TVITEM lParam);
+
         private Button btnSelectFolder = null!;
         private TextBox txtFolderPath = null!;
         private Label lblDepth = null!;
@@ -205,6 +230,7 @@ namespace DesktopKit.FolderViewer
                     // チェックON → 子ノードを構築して展開
                     int depth = TreeBuilder.GetNodeDepth(e.Node);
                     TreeBuilder.ExpandCheckedFolder(e.Node, (int)nudDepth.Value, depth + 1);
+                    HideFileCheckBoxes(e.Node.Nodes);
                 }
                 else
                 {
@@ -286,12 +312,48 @@ namespace DesktopKit.FolderViewer
             try
             {
                 var (folders, files) = TreeBuilder.Build(tvFolderTree, _currentRootPath, (int)nudDepth.Value);
+                HideFileCheckBoxes(tvFolderTree.Nodes);
                 StatusLabel.Text = $"{folders}フォルダ、{files}ファイルを表示中";
             }
             finally
             {
                 _suppressCheckEvent = false;
             }
+        }
+
+        /// <summary>
+        /// ファイルノードのチェックボックスを非表示にする（再帰）。
+        /// </summary>
+        private void HideFileCheckBoxes(TreeNodeCollection nodes)
+        {
+            foreach (TreeNode node in nodes)
+            {
+                if (!TreeBuilder.IsFolder(node))
+                {
+                    HideCheckBox(node);
+                }
+                if (node.Nodes.Count > 0)
+                {
+                    HideFileCheckBoxes(node.Nodes);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 指定ノードのチェックボックスを非表示にする（Win32 API）。
+        /// </summary>
+        private void HideCheckBox(TreeNode node)
+        {
+            if (tvFolderTree.IsDisposed || !tvFolderTree.IsHandleCreated) return;
+
+            var tvi = new TVITEM
+            {
+                hItem = node.Handle,
+                mask = TVIF_STATE,
+                stateMask = TVIS_STATEIMAGEMASK,
+                state = 0
+            };
+            SendMessage(tvFolderTree.Handle, TVM_SETITEM, IntPtr.Zero, ref tvi);
         }
 
         // --- 設定の保存・読み込み ---
