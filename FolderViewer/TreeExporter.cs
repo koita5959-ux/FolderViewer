@@ -70,10 +70,15 @@ namespace DesktopKit.FolderViewer
                         sb.AppendLine(indent + connector + node.Text);
                         BuildTreeText(node, childIndent, sb, fullPaths);
                     }
+                    else if (node.Nodes.Count > 0)
+                    {
+                        // チェックOFF かつ 子要素あり → フォルダ名＋（省略）を出力、子は展開しない
+                        sb.AppendLine(indent + connector + node.Text + "（省略）");
+                    }
                     else
                     {
-                        // チェックOFF → フォルダ名＋（省略）を出力、子は展開しない
-                        sb.AppendLine(indent + connector + node.Text + "（省略）");
+                        // 空フォルダ → フォルダ名のみ出力（「省略」なし）
+                        sb.AppendLine(indent + connector + node.Text);
                     }
                 }
                 else
