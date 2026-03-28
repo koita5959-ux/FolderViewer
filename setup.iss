@@ -1,4 +1,4 @@
-[Setup]
+﻿[Setup]
 AppId=DesktopKit_FolderViewer
 AppName=FolderViewer
 AppVersion=1.00
@@ -11,7 +11,8 @@ OutputBaseFilename=FolderViewer_Setup_v1.00
 Compression=lzma
 SolidCompression=yes
 UninstallDisplayName=FolderViewer
-UninstallDisplayIcon={app}\FolderViewer.exe
+SetupIconFile=_works\FolderViewer1.ico
+UninstallDisplayIcon={app}\FolderViewer1.ico
 PrivilegesRequired=admin
 CloseApplications=no
 CloseApplicationsFilter=FolderViewer.exe
@@ -27,11 +28,12 @@ Name: "japanese"; MessagesFile: "compiler:Languages\Japanese.isl"
 
 [Files]
 Source: "publish\DesktopKit.FolderViewer.exe"; DestDir: "{app}"; DestName: "FolderViewer.exe"; Flags: ignoreversion
-Source: "ご利用ガイド.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "_works\FolderViewer1.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "ご利用にあたって.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\FolderViewer"; Filename: "{app}\FolderViewer.exe"
-Name: "{userdesktop}\FolderViewer"; Filename: "{app}\FolderViewer.exe"; Tasks: desktopicon
+Name: "{group}\FolderViewer"; Filename: "{app}\FolderViewer.exe"; IconFilename: "{app}\FolderViewer1.ico"
+Name: "{userdesktop}\FolderViewer"; Filename: "{app}\FolderViewer.exe"; IconFilename: "{app}\FolderViewer1.ico"; Tasks: desktopicon
 
 [Tasks]
 Name: "desktopicon"; Description: "デスクトップにショートカットを作成"; GroupDescription: "追加オプション:"
@@ -42,7 +44,7 @@ Type: filesandordirs; Name: "{app}"
 
 [Code]
 const
-  OPTIMAL_RUNTIME_VERSION = '8.0.16';
+  OPTIMAL_RUNTIME_VERSION = '8.0.24';
   RUNTIME_REG_KEY = 'SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App';
   UNINSTALL_REG_KEY = 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\DesktopKit_FolderViewer_is1';
   COLOR_RED = $004040FF;
@@ -205,11 +207,8 @@ begin
       end;
   end;
 
-  RadioInstallBoth.Enabled := (DetectedRuntimeStatus <> 1);
-  if RadioInstallBoth.Enabled then
-    LblDescBoth.Font.Color := COLOR_DESC
-  else
-    LblDescBoth.Font.Color := COLOR_DESC_DISABLED;
+  RadioInstallBoth.Enabled := True;
+  LblDescBoth.Font.Color := COLOR_DESC;
 
   RadioInstallApp.Enabled := True;
   LblDescApp.Font.Color := COLOR_DESC;
@@ -220,16 +219,9 @@ begin
   else
     LblDescUninstall.Font.Color := COLOR_DESC_DISABLED;
 
-  RadioInstallBoth.Checked := False;
+  RadioInstallBoth.Checked := True;
   RadioInstallApp.Checked := False;
   RadioUninstall.Checked := False;
-
-  if RadioInstallBoth.Enabled then
-    RadioInstallBoth.Checked := True
-  else if RadioInstallApp.Enabled then
-    RadioInstallApp.Checked := True
-  else if RadioUninstall.Enabled then
-    RadioUninstall.Checked := True;
 end;
 
 // ========== ウィザードUI構築 ==========
@@ -371,20 +363,10 @@ begin
 
   if not FileExists(RuntimeInstaller) then
   begin
-    if MsgBox('.NET Desktop Runtime がこのPCにインストールされていません。' + #13#10 +
-      'Microsoftのサイトからダウンロードしてインストールしますか？' + #13#10#13#10 +
-      '「はい」を押すとブラウザが開きます。ダウンロードしたファイルを実行してインストールしてください。',
-      mbConfirmation, MB_YESNO) = IDYES then
-    begin
-      ShellExec('open',
-        'https://dotnet.microsoft.com/ja-jp/download/dotnet/8.0',
-        '', '', SW_SHOWNORMAL, ewNoWait, ResultCode);
-      MsgBox('.NET Desktop Runtime のインストールが完了したら「OK」を押してください。',
-        mbInformation, MB_OK);
-      DetectEnvironment();
-      ApplyDetectionResults();
-      Result := True;
-    end;
+    MsgBox('.NET Desktop Runtime のインストーラーが見つかりません。' + #13#10 +
+      '以下のファイルをセットアップと同じフォルダに配置してください：' + #13#10#13#10 +
+      'windowsdesktop-runtime-' + OPTIMAL_RUNTIME_VERSION + '-win-x64.exe',
+      mbError, MB_OK);
     Exit;
   end;
 
@@ -392,8 +374,24 @@ begin
     'ランタイムのインストーラーが起動しますので、指示に従ってインストールしてください。',
     mbInformation, MB_OK);
 
-  if Exec(RuntimeInstaller, '', '', SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode) then
-    Result := (ResultCode = 0)
+  if Exec(RuntimeInstaller, '/install /passive /norestart', '', SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode) then
+  begin
+    if ResultCode = 0 then
+    begin
+      Result := True;
+      DetectEnvironment();
+      ApplyDetectionResults();
+    end
+    else if ResultCode = 1602 then
+      MsgBox('ランタイムのインストールがキャンセルされました。', mbInformation, MB_OK)
+    else if ResultCode = 1638 then
+    begin
+      Result := True;
+      MsgBox('より新しいバージョンのランタイムが既にインストールされています。', mbInformation, MB_OK);
+    end
+    else
+      MsgBox('ランタイムのインストールに失敗しました。（エラーコード: ' + IntToStr(ResultCode) + '）', mbError, MB_OK);
+  end
   else
     MsgBox('ランタイムインストーラーの起動に失敗しました。', mbError, MB_OK);
 end;
@@ -452,15 +450,18 @@ begin
     if RadioInstallBoth.Checked then
     begin
       SelectedAction := 'both';
-      RuntimeResult := InstallRuntime();
-      if not RuntimeResult then
+      if DetectedRuntimeStatus <> 1 then
       begin
-        if MsgBox('ランタイムのインストールが完了しませんでした。' + #13#10 +
-          'FolderViewer のインストールを続けますか？',
-          mbConfirmation, MB_YESNO) = IDNO then
+        RuntimeResult := InstallRuntime();
+        if not RuntimeResult then
         begin
-          Result := False;
-          Exit;
+          if MsgBox('ランタイムのインストールが完了しませんでした。' + #13#10 +
+            'FolderViewer のインストールを続けますか？',
+            mbConfirmation, MB_YESNO) = IDNO then
+          begin
+            Result := False;
+            Exit;
+          end;
         end;
       end;
       Result := True;
