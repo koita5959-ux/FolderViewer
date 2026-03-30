@@ -86,7 +86,7 @@ namespace DesktopKit.FolderViewer
             {
                 ReadOnly = true,
                 Location = new Point(140, 10),
-                Size = new Size(620, 23),
+                Size = new Size(topPanel.ClientSize.Width - 140 - 20, 23),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
 
@@ -156,6 +156,9 @@ namespace DesktopKit.FolderViewer
             Controls.Add(tvFolderTree);
             Controls.Add(topPanel);
             Controls.Add(bottomPanel);
+
+            // StatusBar（リサイズグリップ）をウィンドウ最下層に配置
+            StatusBar.SendToBack();
         }
 
         // --- アイコン生成 ---
